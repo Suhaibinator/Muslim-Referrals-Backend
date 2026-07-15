@@ -1,6 +1,6 @@
 # Step 1: Build the Go app in a build stage
 # Use the official Golang image to build the application
-FROM golang:1.24.2-alpine3.21 AS build
+FROM golang:1.26.5-alpine3.24 AS build
 
 # Install git, gcc, and other dependencies required for Go modules and CGO
 RUN apk add --no-cache git gcc musl-dev sqlite-dev curl make

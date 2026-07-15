@@ -9,38 +9,31 @@ on:
 jobs:
   restrict-merge:
     runs-on: ubuntu-latest
+    permissions:
+      checks: write # Needed to create the Approval Check run
+      pull-requests: read # Needed to list reviews
 
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v2
-
       - name: Check if PR is approved by non-author
         id: check-approval
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           script: |
             const pr = context.payload.pull_request || context.payload.review.pull_request;
             const { owner, repo } = context.repo;
             const prAuthor = pr.user.login;
 
-            let reviews = [];
-            try {
-              // Attempt to get reviews
-              reviews = await github.pulls.listReviews({
-                owner: owner,
-                repo: repo,
-                pull_number: pr.number,
-              });
-            } catch (error) {
-              // If fetching reviews fails, handle the error
-              console.error('Failed to fetch reviews:', error.message);
-            }
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: owner,
+              repo: repo,
+              pull_number: pr.number,
+            });
 
             // Check if there is at least one approval from a different user than the PR author
-            const approvedByOther = reviews.data ? reviews.data.some(review => review.state === 'APPROVED' && review.user.login !== prAuthor) : false;
+            const approvedByOther = reviews.some(review => review.state === 'APPROVED' && review.user.login !== prAuthor);
 
             // Create a check run with neutral status if not approved by a non-author
-            await github.checks.create({
+            await github.rest.checks.create({
               owner: owner,
               repo: repo,
               name: 'Approval Check',
@@ -49,8 +42,8 @@ jobs:
               conclusion: approvedByOther ? 'success' : 'neutral',
               output: {
                 title: 'Approval Check',
-                summary: approvedByOther 
-                  ? 'PR is approved by a non-author.' 
+                summary: approvedByOther
+                  ? 'PR is approved by a non-author.'
                   : 'PR is not approved by a non-author.',
               },
             });
